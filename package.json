@@ -1,0 +1,28 @@
+{
+  "name": "capacitor-app",
+  "version": "1.0.0",
+  "description": "An Amazing Capacitor App",
+  "type": "module",
+  "keywords": [
+    "capacitor",
+    "mobile"
+  ],
+  "scripts": {
+    "start": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "open-site": "powershell -NoProfile -Command \"Start-Process 'https://posmartly.com'\""
+  },
+  "dependencies": {
+    "@capacitor/android": "^7.6.0",
+    "@capacitor/camera": "^7.0.5",
+    "@capacitor/core": "^7.6.0",
+    "@capacitor/splash-screen": "^7.0.5"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^7.6.0",
+    "vite": "^7.3.1"
+  },
+  "author": "",
+  "license": "ISC"
+}

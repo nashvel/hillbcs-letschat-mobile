@@ -1,0 +1,14 @@
+{
+  "appId": "com.example.hillbcs",
+  "appName": "Talipapa",
+  "webDir": "dist",
+  "server": {
+    "url": "https://talipapa.store/"
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchAutoHide": true,
+      "launchShowDuration": 0
+    }
+  }
+}

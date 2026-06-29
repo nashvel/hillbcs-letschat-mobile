@@ -1,0 +1,13 @@
+{
+  "name": "Hill AI Chatbot",
+  "short_name": "Hill AI Chatbot",
+  "start_url": "index.html",
+  "display": "standalone",
+  "icons": [{
+    "src": "assets/imgs/logo.png",
+    "sizes": "512x512",
+    "type": "image/png"
+  }],
+  "background_color": "#0d9488",
+  "theme_color": "#0d9488"
+}
