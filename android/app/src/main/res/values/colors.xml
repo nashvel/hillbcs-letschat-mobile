@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+        Brand blue, matching the theme_color the web app declares in its
+        manifest. Defined here as well as in capacitor.config.ts because the two
+        apply at different moments: the Capacitor value is set by the StatusBar
+        plugin once the bridge is running, while this one styles the launch
+        window that is on screen before that. Without both, the app opens on a
+        white strip that then flips to blue.
+    -->
+    <color name="brandBlue">#0b82ee</color>
+</resources>

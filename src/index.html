@@ -2,31 +2,37 @@
 <html lang="en" dir="ltr">
   <head>
     <meta charset="UTF-8" />
-    <title>Hill AI Chatbot</title>
+    <title>Let's Chat</title>
+    <!--
+      viewport-fit=cover so the page reaches under the status bar and the home
+      indicator; the app itself reads the safe-area insets and pads accordingly.
+      Zoom is pinned because a pinch-zoom on a chat surface only ever misaligns
+      the composer.
+    -->
     <meta
       name="viewport"
       content="viewport-fit=cover, width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no"
     />
     <meta name="format-detection" content="telephone=no" />
     <meta name="msapplication-tap-highlight" content="no" />
-
-    <script
-      type="module"
-      src="https://unpkg.com/@ionic/pwa-elements@latest/dist/ionicpwaelements/ionicpwaelements.esm.js"
-    ></script>
-    <script
-      nomodule
-      src="https://unpkg.com/@ionic/pwa-elements@latest/dist/ionicpwaelements/ionicpwaelements.js"
-    ></script>
-
-    <link rel="icon" type="image/png" href="./assets/imgs/logo.png" />
     <link rel="manifest" href="./manifest.json" />
     <link rel="stylesheet" href="./css/style.css" />
-    <meta name="theme-color" content="#0d9488" />
+    <!-- Brand blue, so the fallback page does not disagree with the status bar. -->
+    <meta name="theme-color" content="#0b82ee" />
   </head>
   <body>
-    <capacitor-welcome></capacitor-welcome>
-
-    <script src="./js/capacitor-welcome.js" type="module"></script>
+    <!--
+      This page is only ever seen when the WebView cannot reach the deployed app.
+      With `server.url` set, Capacitor loads Let's Chat from the network and these
+      bundled assets are never rendered, so there is deliberately nothing here
+      but a retry.
+    -->
+    <main class="shell" role="main">
+      <h1 class="shell__title">Let's Chat</h1>
+      <p class="shell__message" id="message">Can't reach Let's Chat right now.</p>
+      <p class="shell__hint">Check your connection, then try again.</p>
+      <button class="shell__button" type="button" id="retry">Try again</button>
+    </main>
+    <script src="./js/offline.js" type="module"></script>
   </body>
 </html>

@@ -1,9 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+    The root is painted brand blue rather than left transparent, and that is what
+    colours the status bar.
+
+    From Android 15 (API 35) an app targeting 35+ is forced edge-to-edge and both
+    android:statusBarColor and Window.setStatusBarColor() — the latter being what
+    Capacitor's StatusBar.setBackgroundColor calls — are ignored. The bar is
+    always transparent, so its apparent colour is whatever sits underneath. With
+    overlaysWebView:false Capacitor insets the WebView below the cutout, leaving
+    this root visible in that strip.
+-->
 <androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:background="@color/brandBlue"
     tools:context=".MainActivity">
 
     <WebView

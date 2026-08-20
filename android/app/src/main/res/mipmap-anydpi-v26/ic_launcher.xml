@@ -2,5 +2,10 @@
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
     <background android:drawable="@color/ic_launcher_background"/>
     <foreground android:drawable="@mipmap/ic_launcher_foreground"/>
-    <monochrome android:drawable="@mipmap/ic_launcher_foreground"/>
+    <!--
+      No <monochrome>: the artwork is line-art colour, and a themed icon derived
+      from its alpha collapses the globe, the H, and the bubble dots into one
+      illegible silhouette. Without the entry Android falls back to the full
+      colour icon under themed icons, which is what the Hillbcs Chats app does.
+    -->
 </adaptive-icon>

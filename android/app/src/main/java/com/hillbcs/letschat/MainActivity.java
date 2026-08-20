@@ -1,4 +1,4 @@
-package com.example.mywebapp;
+package com.hillbcs.letschat;
 
 import android.app.DownloadManager;
 import android.content.Context;
@@ -6,9 +6,15 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
+import android.view.View;
+import android.view.ViewGroup;
 import android.webkit.CookieManager;
 import android.webkit.URLUtil;
 import android.webkit.WebView;
+import android.widget.FrameLayout;
+import androidx.core.content.ContextCompat;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowInsetsCompat;
 import com.getcapacitor.Bridge;
 import com.getcapacitor.BridgeActivity;
 
@@ -34,6 +40,55 @@ public class MainActivity extends BridgeActivity {
         super.onCreate(savedInstanceState);
         registerDownloadListener();
         configureWebViewPopups();
+        paintStatusBarStrip();
+    }
+
+    /**
+     * Paints the status bar area with the brand colour.
+     *
+     * From Android 15 (API 35), an app targeting 35 or later is forced edge-to-edge
+     * and the status bar is permanently transparent: {@code android:statusBarColor}
+     * and {@code Window.setStatusBarColor()} are ignored, and so is Capacitor's
+     * {@code StatusBar.setBackgroundColor}, which calls the latter. The bar shows
+     * whatever is behind it, which here is the WebView — hence a white strip with
+     * light icons on it, effectively invisible.
+     * <p>
+     * A view laid over that strip is the remaining way to colour it. Nothing is
+     * hidden by it: the web app declares {@code viewport-fit=cover} and pads its
+     * own header by {@code env(safe-area-inset-top)}, so the region underneath is
+     * empty background.
+     * <p>
+     * The height comes from the live inset rather than a dimension resource so it
+     * survives rotation, a change of display cutout, and devices whose bar is not
+     * the usual 24dp.
+     */
+    private void paintStatusBarStrip() {
+        ViewGroup content = findViewById(android.R.id.content);
+        if (content == null) {
+            return;
+        }
+
+        final View strip = new View(this);
+        strip.setBackgroundColor(ContextCompat.getColor(this, R.color.brandBlue));
+        // Starts collapsed; the inset listener below gives it its real height.
+        strip.setLayoutParams(new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, 0));
+        // Added last so it draws above the WebView.
+        content.addView(strip);
+
+        ViewCompat.setOnApplyWindowInsetsListener(
+            content,
+            (view, insets) -> {
+                int top = insets.getInsets(WindowInsetsCompat.Type.statusBars()).top;
+                ViewGroup.LayoutParams params = strip.getLayoutParams();
+                if (params.height != top) {
+                    params.height = top;
+                    strip.setLayoutParams(params);
+                }
+                // Passed through untouched: Capacitor's own inset handling drives
+                // the keyboard resize, and consuming them here would break it.
+                return insets;
+            }
+        );
     }
 
     @Override

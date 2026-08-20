@@ -1,26 +1,32 @@
 {
-  "name": "capacitor-app",
+  "name": "letschat-mobile-wrapper",
   "version": "1.0.0",
-  "description": "An Amazing Capacitor App",
+  "description": "Android WebView wrapper for the Let's Chat React app",
   "type": "module",
+  "private": true,
   "keywords": [
     "capacitor",
-    "mobile"
+    "mobile",
+    "hillbcs"
   ],
   "scripts": {
     "start": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "open-site": "powershell -NoProfile -Command \"Start-Process 'https://posmartly.com'\""
+    "sync": "vite build && cap sync android",
+    "open:android": "cap open android"
   },
   "dependencies": {
     "@capacitor/android": "^7.6.0",
     "@capacitor/camera": "^7.0.5",
     "@capacitor/core": "^7.6.0",
-    "@capacitor/splash-screen": "^7.0.5"
+    "@capacitor/keyboard": "^7.0.6",
+    "@capacitor/splash-screen": "^7.0.5",
+    "@capacitor/status-bar": "^7.0.6"
   },
   "devDependencies": {
     "@capacitor/cli": "^7.6.0",
+    "typescript": "^5.9.3",
     "vite": "^7.3.1"
   },
   "author": "",

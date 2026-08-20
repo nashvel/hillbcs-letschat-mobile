@@ -1,5 +1,86 @@
+/*
+ * Styles for the offline fallback only. The real UI is served from the remote
+ * app, so nothing here should try to anticipate it.
+ */
+
+:root {
+  color-scheme: light dark;
+  --surface: #ffffff;
+  --ink: #0f172a;
+  --ink-muted: #64748b;
+  --accent: #2563eb;
+  --accent-ink: #ffffff;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --surface: #0f172a;
+    --ink: #f1f5f9;
+    --ink-muted: #94a3b8;
+    --accent: #3b82f6;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
 html,
 body {
-  padding: 0;
   margin: 0;
+  height: 100%;
+  background: var(--surface);
+  color: var(--ink);
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
+}
+
+.shell {
+  display: flex;
+  min-height: 100%;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  /* Clears the notch and the home indicator on a cut-out display. */
+  padding: max(1.5rem, env(safe-area-inset-top)) 1.5rem max(1.5rem, env(safe-area-inset-bottom));
+  text-align: center;
+}
+
+.shell__title {
+  margin: 0 0 0.25rem;
+  font-size: 1.375rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.shell__message {
+  margin: 0;
+  font-size: 0.9375rem;
+}
+
+.shell__hint {
+  margin: 0 0 1.25rem;
+  font-size: 0.8125rem;
+  color: var(--ink-muted);
+}
+
+.shell__button {
+  min-height: 44px; /* Comfortable touch target. */
+  padding: 0.625rem 1.5rem;
+  border: 0;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-family: inherit;
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+
+.shell__button:active {
+  opacity: 0.85;
 }

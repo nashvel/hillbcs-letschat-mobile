@@ -1,4 +1,4 @@
-package com.example.mywebapp;
+package com.hillbcs.letschat;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
