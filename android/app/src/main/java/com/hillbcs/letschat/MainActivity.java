@@ -65,6 +65,9 @@ public class MainActivity extends BridgeActivity {
         }
         updateInstaller = new UpdateInstaller(this);
         webView.addJavascriptInterface(updateInstaller, "HillbcsUpdater");
+        // Capability probes, so the web layer can avoid calling into a plugin this
+        // build cannot support. Named to match the Laravel messenger's shell.
+        webView.addJavascriptInterface(new NativeCapabilities(this), "HillbcsNative");
     }
 
     @Override

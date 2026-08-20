@@ -109,11 +109,39 @@ This wrapper contributes the native half: `@capacitor/push-notifications`,
 `src/features/notifications/services/nativePush.ts`, because only it holds the
 bearer token that ties a device token to an account.
 
-### One manual step is still outstanding
+### Currently disabled — `@capacitor/push-notifications` is uninstalled
 
-**Firebase has no Android app registered for `com.hillbcs.letschat` yet, so push
-cannot work until this is done.** The existing `google-services.json` belongs to
-`com.hillbcs.chat` and is not interchangeable — the package name is baked into it.
+It had to come out. With the plugin present but Firebase unconfigured,
+`PushNotifications.register()` reaches `FirebaseMessaging.getInstance()`, which
+throws `IllegalStateException` on Capacitor's plugin thread. That is an uncaught
+*native* exception, so it force closes the app and no JavaScript `try`/`catch`
+can contain it — observed on a real device before the plugin was removed.
+
+The plugin therefore may not be reinstalled until `google-services.json` exists.
+The release workflow enforces the same rule and fails without the
+`GOOGLE_SERVICES_JSON` secret, so a crashing APK cannot be published.
+
+`firebase-messaging` is still in `app/build.gradle`. Harmless on its own — it logs
+one initialisation warning and nothing calls into it — and it keeps the diff small
+when push is switched back on.
+
+To re-enable, once step 3 below is done:
+
+```bash
+npm install @capacitor/push-notifications@^7.0.0
+npm run sync && cd android && ./gradlew assembleDebug
+```
+
+The web layer already guards the call: `nativePush.ts` asks
+`window.HillbcsNative.pushAvailable()` — backed by `FirebaseApp.getApps()` in
+`NativeCapabilities.java` — and skips registration entirely when Firebase did not
+initialise, so an under-configured build degrades instead of dying.
+
+### The step that unblocks all of this
+
+**Firebase has no Android app registered for `com.hillbcs.letschat`.** The existing
+`google-services.json` belongs to `com.hillbcs.chat` and is not interchangeable —
+the package name is baked into it.
 
 1. In the [Firebase console](https://console.firebase.google.com/), open the
    project already used by Hillbcs Chats (the one `FIREBASE_PROJECT_ID` names).

@@ -58,18 +58,33 @@ jobs:
         run: npm run build
 
       - name: Restore Firebase config
-        # Absent on forks and before Firebase is set up. The Gradle script only
-        # applies the google-services plugin when the file exists, so the build
-        # still succeeds — push simply will not work in that APK.
+        # Fatal, not a warning. With the push plugin present but Firebase
+        # unconfigured, PushNotifications.register() reaches
+        # FirebaseMessaging.getInstance(), which throws IllegalStateException on
+        # Capacitor's plugin thread — an uncaught native exception that force
+        # closes the app. Publishing such a build would ship a crash, so the
+        # release stops here instead.
         env:
           GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
         run: |
-          if [ -n "$GOOGLE_SERVICES_JSON" ]; then
-            printf '%s' "$GOOGLE_SERVICES_JSON" > android/app/google-services.json
-            echo "google-services.json written"
-          else
-            echo "::warning::GOOGLE_SERVICES_JSON secret is not set; this build cannot receive push notifications"
+          if [ -z "$GOOGLE_SERVICES_JSON" ]; then
+            echo "::error::GOOGLE_SERVICES_JSON is not set. An APK built without it force closes when the web app registers for push."
+            exit 1
           fi
+          printf '%s' "$GOOGLE_SERVICES_JSON" > android/app/google-services.json
+          node -e "JSON.parse(require('fs').readFileSync('android/app/google-services.json','utf8'))" \
+            || { echo "::error::GOOGLE_SERVICES_JSON is not valid JSON"; exit 1; }
+          # Guard against pasting the Hillbcs Chats file, which is for a different
+          # package name and would leave push silently broken.
+          node -e "
+            const j = require('./android/app/google-services.json');
+            const names = (j.client ?? []).map(c => c.client_info?.android_client_info?.package_name);
+            if (!names.includes('com.hillbcs.letschat')) {
+              console.error('::error::google-services.json has no client for com.hillbcs.letschat (found: ' + names.join(', ') + ')');
+              process.exit(1);
+            }
+          "
+          echo "google-services.json written and validated"
 
       - name: Sync Capacitor
         run: npx cap sync android
