@@ -40,7 +40,8 @@ import java.util.List;
  */
 public class UpdateInstaller {
     private static final String TAG = "HillbcsUpdater";
-    private static final String FILE_NAME = "letschat-update.apk";
+    private static final String FILE_PREFIX = "letschat-update";
+    private static final String FILE_NAME = FILE_PREFIX + ".apk";
 
     /**
      * GitHub serves release assets from the API host and redirects to its object
@@ -78,14 +79,12 @@ public class UpdateInstaller {
             return false;
         }
 
-        // A fresh copy every time; a partial file from a failed attempt would
-        // otherwise be handed to the installer and rejected as corrupt.
-        File target = new File(activity.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), FILE_NAME);
-        if (target.exists() && !target.delete()) {
-            Log.w(TAG, "Could not clear previous update download");
-        }
+        // Best effort only, and deliberately not depended on: see
+        // downloadedFile() for why the install no longer assumes a fixed name.
+        // Worth doing anyway, because each of these is tens of megabytes.
+        clearPreviousDownloads();
 
-        registerCompletionReceiver(manager, target);
+        registerCompletionReceiver(manager);
 
         DownloadManager.Request request = new DownloadManager.Request(uri)
             .setTitle("Let's Chat update")
@@ -212,7 +211,7 @@ public class UpdateInstaller {
         }
     }
 
-    private void registerCompletionReceiver(DownloadManager manager, File target) {
+    private void registerCompletionReceiver(DownloadManager manager) {
         dispose();
 
         completionReceiver = new BroadcastReceiver() {
@@ -222,8 +221,9 @@ public class UpdateInstaller {
                 if (id != pendingDownloadId) {
                     return;
                 }
-                if (downloadSucceeded(manager, id) && target.exists()) {
-                    launchInstaller(target);
+                File apk = downloadedFile(manager, id);
+                if (apk != null && apk.exists()) {
+                    launchInstaller(apk);
                 } else {
                     Log.w(TAG, "Update download did not complete successfully");
                 }
@@ -240,16 +240,57 @@ public class UpdateInstaller {
         }
     }
 
-    private boolean downloadSucceeded(DownloadManager manager, long id) {
+    /**
+     * Where the download actually landed, or null unless it completed.
+     *
+     * <p>Read back from DownloadManager rather than assumed to be {@link #FILE_NAME}.
+     * DownloadManager will not overwrite an existing destination: it silently
+     * writes to {@code letschat-update-1.apk} instead and reports success. Code
+     * that then installs the fixed name hands the system installer whatever older
+     * APK is still sitting there — so asking for 1.0.8 would install 1.0.7, or
+     * fail outright against a half-written file from an earlier attempt. Deleting
+     * the old copy first is not enough on its own, because the file belongs to the
+     * DownloadManager process and the delete can be refused.
+     */
+    private File downloadedFile(DownloadManager manager, long id) {
         try (android.database.Cursor cursor =
                  manager.query(new DownloadManager.Query().setFilterById(id))) {
             if (cursor == null || !cursor.moveToFirst()) {
-                return false;
+                return null;
             }
             int status = cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS));
-            return status == DownloadManager.STATUS_SUCCESSFUL;
+            if (status != DownloadManager.STATUS_SUCCESSFUL) {
+                return null;
+            }
+            String localUri = cursor.getString(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_LOCAL_URI));
+            if (localUri == null) {
+                return null;
+            }
+            Uri uri = Uri.parse(localUri);
+            // Downloads aimed at our own external files dir come back as file://.
+            // Anything else is not ours to hand to the installer via FileProvider.
+            String path = "file".equalsIgnoreCase(uri.getScheme()) ? uri.getPath() : null;
+            return path == null ? null : new File(path);
         } catch (Exception e) {
-            return false;
+            Log.w(TAG, "Could not resolve the downloaded update", e);
+            return null;
+        }
+    }
+
+    /** Drops earlier update APKs, including any {@code -1} copies left by a collision. */
+    private void clearPreviousDownloads() {
+        File dir = activity.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
+        if (dir == null) {
+            return;
+        }
+        File[] stale = dir.listFiles((unused, name) -> name.startsWith(FILE_PREFIX) && name.endsWith(".apk"));
+        if (stale == null) {
+            return;
+        }
+        for (File file : stale) {
+            if (!file.delete()) {
+                Log.w(TAG, "Could not remove " + file.getName());
+            }
         }
     }
 
