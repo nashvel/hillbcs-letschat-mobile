@@ -14,6 +14,9 @@ import android.webkit.JavascriptInterface;
 
 import androidx.core.content.FileProvider;
 
+import org.json.JSONException;
+import org.json.JSONObject;
+
 import java.io.File;
 import java.util.Arrays;
 import java.util.List;
@@ -95,6 +98,74 @@ public class UpdateInstaller {
 
         pendingDownloadId = manager.enqueue(request);
         return true;
+    }
+
+    /**
+     * State of the download in progress, as JSON, for the web layer to poll:
+     * {@code {"state":"downloading","bytes":4194304,"total":6553600}}.
+     *
+     * <p>Polled rather than pushed. DownloadManager reports progress by cursor
+     * query, so there is no callback to forward, and a pull keeps this in the same
+     * shape as the rest of the bridge — a plain synchronous getter with no
+     * listener to leak if the web layer navigates away mid-download.
+     *
+     * <p>{@code total} is -1 until the server declares a length, which is the
+     * caller's cue to show an indeterminate bar rather than a misleading 0%.
+     *
+     * <p>{@code state} is one of idle, pending, downloading, paused, installing,
+     * failed. "installing" means the bytes have landed and the system installer
+     * has been handed the file; the app is not in control after that point.
+     */
+    @JavascriptInterface
+    public String downloadProgress() {
+        if (pendingDownloadId == -1L) {
+            return progressJson("idle", 0L, -1L);
+        }
+
+        DownloadManager manager = (DownloadManager) activity.getSystemService(Context.DOWNLOAD_SERVICE);
+        if (manager == null) {
+            return progressJson("idle", 0L, -1L);
+        }
+
+        try (android.database.Cursor cursor =
+                 manager.query(new DownloadManager.Query().setFilterById(pendingDownloadId))) {
+            if (cursor == null || !cursor.moveToFirst()) {
+                // The row is gone: cleared from the download list, or the id was
+                // never accepted. Nothing to report on.
+                return progressJson("idle", 0L, -1L);
+            }
+
+            int status = cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS));
+            long bytes = cursor.getLong(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR));
+            long total = cursor.getLong(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_TOTAL_SIZE_BYTES));
+
+            switch (status) {
+                case DownloadManager.STATUS_PENDING:
+                    return progressJson("pending", bytes, total);
+                case DownloadManager.STATUS_RUNNING:
+                    return progressJson("downloading", bytes, total);
+                case DownloadManager.STATUS_PAUSED:
+                    return progressJson("paused", bytes, total);
+                case DownloadManager.STATUS_SUCCESSFUL:
+                    // Report a full bar: at 100% the reported byte count can still
+                    // trail the total by a chunk, which would otherwise leave the
+                    // UI stuck at 98% while the installer is already open.
+                    return progressJson("installing", total > 0 ? total : bytes, total);
+                default:
+                    return progressJson("failed", bytes, total);
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Could not read download progress", e);
+            return progressJson("failed", 0L, -1L);
+        }
+    }
+
+    private String progressJson(String state, long bytes, long total) {
+        try {
+            return new JSONObject().put("state", state).put("bytes", bytes).put("total", total).toString();
+        } catch (JSONException e) {
+            return "{\"state\":\"failed\",\"bytes\":0,\"total\":-1}";
+        }
     }
 
     /** Whether the user still has to allow installing from this app. */
