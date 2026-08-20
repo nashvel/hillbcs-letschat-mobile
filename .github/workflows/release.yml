@@ -123,7 +123,14 @@ jobs:
         id: policy
         run: |
           echo "minimum=$(node -p "require('./update-policy.json').minimumBuild")" >> "$GITHUB_OUTPUT"
-          echo "notes=$(node -p "require('./update-policy.json').notes")" >> "$GITHUB_OUTPUT"
+          # Delimited form, because release notes may legitimately span lines and
+          # the plain `key=value` form would truncate at the first newline and
+          # leave the rest to be parsed as further outputs.
+          {
+            echo 'notes<<POLICY_NOTES_EOF'
+            node -p "require('./update-policy.json').notes"
+            echo 'POLICY_NOTES_EOF'
+          } >> "$GITHUB_OUTPUT"
 
       - name: Write update manifest
         # Published alongside the APK for anything that wants the whole picture in
