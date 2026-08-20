@@ -130,8 +130,11 @@ public class MainActivity extends BridgeActivity {
                 if (params.height != top) {
                     params.height = top;
                     strip.setLayoutParams(params);
+                    // Insets are dispatched on every layout pass, so this is kept
+                    // to changes only: it is here to make a bar that renders the
+                    // wrong height diagnosable from logcat without a rebuild.
+                    Log.d(TAG, "status bar strip resized to " + top + "px");
                 }
-                Log.d(TAG, "status bar inset top=" + top + "px, strip height=" + params.height);
                 /*
                  * Passed through rather than consumed. The WebView is a child of
                  * this view and installs its own listener to read the same insets
