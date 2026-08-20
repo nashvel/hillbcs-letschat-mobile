@@ -6,6 +6,7 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
+import android.util.Log;
 import android.view.View;
 import android.view.ViewGroup;
 import android.webkit.CookieManager;
@@ -35,6 +36,8 @@ import com.getcapacitor.BridgeActivity;
  */
 public class MainActivity extends BridgeActivity {
 
+    private static final String TAG = "HillbcsShell";
+
     private UpdateInstaller updateInstaller;
     private NativeCall nativeCall;
 
@@ -45,30 +48,6 @@ public class MainActivity extends BridgeActivity {
         configureWebViewPopups();
         paintStatusBarStrip();
         exposeUpdater();
-    }
-
-    /**
-     * Reserves the status bar height above the WebView.
-     *
-     * Applied as padding on the WebView rather than a margin on its parent so the
-     * WebView's own background still fills the area during load, and so Capacitor's
-     * keyboard resizing — which adjusts the bottom — is left alone.
-     */
-    private void insetWebViewBelowStatusBar(int top) {
-        Bridge bridge = getBridge();
-        if (bridge == null) {
-            return;
-        }
-        WebView webView = bridge.getWebView();
-        if (webView == null || webView.getPaddingTop() == top) {
-            return;
-        }
-        webView.setPadding(
-            webView.getPaddingLeft(),
-            top,
-            webView.getPaddingRight(),
-            webView.getPaddingBottom()
-        );
     }
 
     /**
@@ -121,10 +100,10 @@ public class MainActivity extends BridgeActivity {
      * whatever is behind it, which here is the WebView — hence a white strip with
      * light icons on it, effectively invisible.
      * <p>
-     * A view laid over that strip is the remaining way to colour it. Nothing is
-     * hidden by it: the web app declares {@code viewport-fit=cover} and pads its
-     * own header by {@code env(safe-area-inset-top)}, so the region underneath is
-     * empty background.
+     * A view laid over that strip is the remaining way to colour it. It hides
+     * nothing, because {@code android.adjustMarginsForEdgeToEdge} in
+     * {@code capacitor.config.ts} margins the WebView below the status bar, so
+     * the region this covers is outside the WebView entirely.
      * <p>
      * The height comes from the live inset rather than a dimension resource so it
      * survives rotation, a change of display cutout, and devices whose bar is not
@@ -152,21 +131,13 @@ public class MainActivity extends BridgeActivity {
                     params.height = top;
                     strip.setLayoutParams(params);
                 }
+                Log.d(TAG, "status bar inset top=" + top + "px, strip height=" + params.height);
                 /*
-                 * Push the WebView down by the same amount, so web content cannot
-                 * occupy the strip at all.
-                 *
-                 * Colouring the strip is not enough on its own: it is drawn over a
-                 * WebView that still fills the window, so any screen that does not
-                 * pad itself by env(safe-area-inset-top) renders underneath and
-                 * gets covered. Only a few surfaces do that — the conversation
-                 * header and sidebar — which is why the problem appeared on some
-                 * screens and not others. Insetting the viewport fixes every
-                 * screen at once, including ones that do not exist yet.
+                 * Passed through rather than consumed. The WebView is a child of
+                 * this view and installs its own listener to read the same insets
+                 * for its margins; consuming them here would starve it and put
+                 * web content back under the bar.
                  */
-                insetWebViewBelowStatusBar(top);
-                // Passed through untouched: Capacitor's own inset handling drives
-                // the keyboard resize, and consuming them here would break it.
                 return insets;
             }
         );

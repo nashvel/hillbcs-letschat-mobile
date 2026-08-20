@@ -53,6 +53,30 @@ const config: CapacitorConfig = {
         // Lets the WebView keep focus and selection behaviour in the composer's
         // contenteditable rather than the native input overlay stealing it.
         captureInput: true,
+        /*
+         * Keeps the WebView inside the system bars by margining it with the
+         * status bar / navigation bar / cutout insets.
+         *
+         * Without this (the default is "disable") the WebView fills the whole
+         * window, so on Android 15+, where an app targeting 35 is forced
+         * edge-to-edge and the status bar is permanently transparent, web
+         * content draws underneath the bar. Only the surfaces that pad
+         * themselves by --app-inset-top — the conversation header and the
+         * sidebar — escaped it, which is why the overlap showed up on some
+         * screens and not others.
+         *
+         * "force" rather than "auto" so the behaviour is identical on every API
+         * level: "auto" only margins on 35+, which would leave older devices on
+         * the old fullscreen layout and a second code path to reason about.
+         *
+         * Capacitor also returns WindowInsetsCompat.CONSUMED here, so
+         * env(safe-area-inset-top) is 0 inside the WebView and the web layer's
+         * own --app-inset-top padding collapses to nothing. That is what keeps
+         * this from double-counting the inset; the margin becomes the single
+         * source of truth. MainActivity then only has to colour the area the
+         * margin exposes.
+         */
+        adjustMarginsForEdgeToEdge: 'force',
     },
     plugins: {
         Keyboard: {
