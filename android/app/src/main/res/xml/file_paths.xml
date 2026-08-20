@@ -2,4 +2,10 @@
 <paths xmlns:android="http://schemas.android.com/apk/res/android">
     <external-path name="my_images" path="." />
     <cache-path name="my_cache_images" path="." />
+    <!--
+        Where a downloaded update APK lands. The installer runs in another process,
+        so it needs a content:// URI granted through this provider — a file:// path
+        has been rejected since Android 7.
+    -->
+    <external-files-path name="updates" path="Download" />
 </paths>

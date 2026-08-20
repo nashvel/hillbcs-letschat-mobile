@@ -35,12 +35,45 @@ import com.getcapacitor.BridgeActivity;
  */
 public class MainActivity extends BridgeActivity {
 
+    private UpdateInstaller updateInstaller;
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         registerDownloadListener();
         configureWebViewPopups();
         paintStatusBarStrip();
+        exposeUpdater();
+    }
+
+    /**
+     * Publishes {@link UpdateInstaller} to the web layer as
+     * {@code window.HillbcsUpdater}.
+     *
+     * Only reachable from the origin this WebView is configured to load, and every
+     * install still goes through the system installer's confirmation, so the worst
+     * a compromised page can do is show the user a prompt.
+     */
+    private void exposeUpdater() {
+        Bridge bridge = getBridge();
+        if (bridge == null) {
+            return;
+        }
+        WebView webView = bridge.getWebView();
+        if (webView == null) {
+            return;
+        }
+        updateInstaller = new UpdateInstaller(this);
+        webView.addJavascriptInterface(updateInstaller, "HillbcsUpdater");
+    }
+
+    @Override
+    public void onDestroy() {
+        if (updateInstaller != null) {
+            updateInstaller.dispose();
+            updateInstaller = null;
+        }
+        super.onDestroy();
     }
 
     /**

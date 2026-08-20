@@ -1,0 +1,16 @@
+{
+  "$comment": [
+    "Controls how hard the app pushes an update. Edited by hand and read by the",
+    "release workflow, so forcing an update is a deliberate act rather than a",
+    "side effect of shipping a build.",
+    "",
+    "minimumBuild: clients on a lower versionCode are blocked with a mandatory",
+    "prompt they cannot dismiss. Raise it only for a breaking API change or a bad",
+    "bug, because it locks people out of the app until they install.",
+    "",
+    "Anything at or above minimumBuild but below the newest build gets a",
+    "dismissible 'update available' notice instead."
+  ],
+  "minimumBuild": 1,
+  "notes": "Bug fixes and improvements."
+}

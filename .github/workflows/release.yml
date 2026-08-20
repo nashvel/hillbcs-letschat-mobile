@@ -1,0 +1,168 @@
+name: Release APK
+
+# Every push to main ships a build, so the version people are running always has
+# a name and a download. Manual runs are allowed for re-cutting a release without
+# a code change.
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - '**/*.md'
+  workflow_dispatch:
+
+permissions:
+  # Needed to create the release and upload the APK.
+  contents: write
+
+concurrency:
+  # Two releases racing would produce two tags claiming to be newest.
+  group: release-apk
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      # Gradle 8.13 does not support JDK 25, so the toolchain is pinned rather
+      # than left to the runner default.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Derive version
+        id: version
+        run: |
+          # github.run_number only increases, which is exactly what versionCode
+          # requires. Deriving it avoids committing a bump back to the repo, which
+          # would retrigger this workflow.
+          BUILD_NUMBER="${{ github.run_number }}"
+          echo "build=$BUILD_NUMBER" >> "$GITHUB_OUTPUT"
+          echo "name=1.0.$BUILD_NUMBER" >> "$GITHUB_OUTPUT"
+          echo "tag=v1.0.$BUILD_NUMBER" >> "$GITHUB_OUTPUT"
+
+      - name: Build web assets
+        run: npm run build
+
+      - name: Restore Firebase config
+        # Absent on forks and before Firebase is set up. The Gradle script only
+        # applies the google-services plugin when the file exists, so the build
+        # still succeeds — push simply will not work in that APK.
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          if [ -n "$GOOGLE_SERVICES_JSON" ]; then
+            printf '%s' "$GOOGLE_SERVICES_JSON" > android/app/google-services.json
+            echo "google-services.json written"
+          else
+            echo "::warning::GOOGLE_SERVICES_JSON secret is not set; this build cannot receive push notifications"
+          fi
+
+      - name: Sync Capacitor
+        run: npx cap sync android
+
+      - name: Restore signing keystore
+        id: keystore
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$ANDROID_KEYSTORE_BASE64" ]; then
+            # Deliberately fatal. An unsigned or debug-signed release cannot be
+            # installed over an existing install, so publishing one would strand
+            # every current user on their old build with no upgrade path.
+            echo "::error::ANDROID_KEYSTORE_BASE64 is not set. Releases must be signed with the same key every time or upgrades are rejected."
+            exit 1
+          fi
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.keystore"
+          echo "path=$RUNNER_TEMP/release.keystore" >> "$GITHUB_OUTPUT"
+
+      - name: Build signed release APK
+        working-directory: android
+        env:
+          BUILD_NUMBER: ${{ steps.version.outputs.build }}
+          VERSION_NAME: ${{ steps.version.outputs.name }}
+          ANDROID_KEYSTORE_FILE: ${{ steps.keystore.outputs.path }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: ./gradlew assembleRelease --no-daemon
+
+      - name: Name the APK after its version
+        id: apk
+        run: |
+          SRC=android/app/build/outputs/apk/release/app-release.apk
+          test -f "$SRC" || { echo "::error::expected APK at $SRC"; exit 1; }
+          DEST="letschat-${{ steps.version.outputs.name }}.apk"
+          cp "$SRC" "$DEST"
+          echo "file=$DEST" >> "$GITHUB_OUTPUT"
+
+      - name: Verify the APK reports the intended version
+        # Cheap guard against the Gradle version wiring silently breaking and
+        # publishing a build the updater would consider stale.
+        run: |
+          AAPT=$(ls -t "$ANDROID_HOME"/build-tools/*/aapt | head -1)
+          BADGING=$("$AAPT" dump badging "${{ steps.apk.outputs.file }}")
+          echo "$BADGING" | head -1
+          echo "$BADGING" | grep -q "versionCode='${{ steps.version.outputs.build }}'" \
+            || { echo "::error::APK versionCode is not ${{ steps.version.outputs.build }}"; exit 1; }
+
+      - name: Read update policy
+        id: policy
+        run: |
+          echo "minimum=$(node -p "require('./update-policy.json').minimumBuild")" >> "$GITHUB_OUTPUT"
+          echo "notes=$(node -p "require('./update-policy.json').notes")" >> "$GITHUB_OUTPUT"
+
+      - name: Write update manifest
+        # Published alongside the APK for anything that wants the whole picture in
+        # one file. The app itself reads the GitHub API instead; see the release
+        # body below for why.
+        run: |
+          MINIMUM=$(node -p "require('./update-policy.json').minimumBuild")
+          NOTES=$(node -p "JSON.stringify(require('./update-policy.json').notes)")
+          cat > update.json <<JSON
+          {
+            "latestBuild": ${{ steps.version.outputs.build }},
+            "latestVersion": "${{ steps.version.outputs.name }}",
+            "minimumBuild": $MINIMUM,
+            "apkUrl": "https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.tag }}/${{ steps.apk.outputs.file }}",
+            "notes": $NOTES,
+            "releasedAt": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          }
+          JSON
+          cat update.json
+          node -e "JSON.parse(require('fs').readFileSync('update.json','utf8'))"
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: ${{ steps.version.outputs.name }}
+          # The `minimumBuild:` line is parsed by the running app.
+          #
+          # It lives in the release body rather than only in the update.json asset
+          # because the app has to read this cross-origin, and while api.github.com
+          # sends `Access-Control-Allow-Origin: *`, release asset downloads do not.
+          # Everything the client needs is therefore in the API response: the build
+          # from the tag, the APK from the asset list, and the policy from here.
+          body: |
+            Build ${{ steps.version.outputs.build }} of the Let's Chat Android wrapper.
+
+            minimumBuild: ${{ steps.policy.outputs.minimum }}
+
+            ${{ steps.policy.outputs.notes }}
+          files: |
+            ${{ steps.apk.outputs.file }}
+            update.json

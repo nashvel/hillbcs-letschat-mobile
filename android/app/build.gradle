@@ -1,5 +1,19 @@
 apply plugin: 'com.android.application'
 
+/*
+ * Version comes from the environment so CI owns it.
+ *
+ * BUILD_NUMBER is the GitHub Actions run number, which only ever increases. That
+ * matters more than it looks: Android refuses to install an APK whose versionCode
+ * is not greater than the installed one, and the in-app updater compares this
+ * number against the published manifest to decide whether a client is stale.
+ *
+ * Falls back to 1 / "1.0-dev" so a local `./gradlew assembleDebug` still works
+ * without any of this set.
+ */
+def ciBuildNumber = (System.getenv("BUILD_NUMBER") ?: "1") as Integer
+def ciVersionName = System.getenv("VERSION_NAME") ?: "1.0-dev"
+
 android {
     namespace "com.hillbcs.letschat"
     compileSdk rootProject.ext.compileSdkVersion
@@ -7,8 +21,8 @@ android {
         applicationId "com.hillbcs.letschat"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode ciBuildNumber
+        versionName ciVersionName
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -16,10 +30,38 @@ android {
             ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    /*
+     * Release signing, driven by env vars so the keystore never lands in the repo.
+     *
+     * The key has to be the *same* on every build that users upgrade through.
+     * Android identifies an app by package name plus signing certificate, so a
+     * build signed with a different key is a different app as far as the installer
+     * is concerned and the upgrade is rejected with
+     * INSTALL_FAILED_UPDATE_INCOMPATIBLE — the user would have to uninstall first,
+     * losing their session. This is why CI must not fall back to a debug key.
+     */
+    signingConfigs {
+        release {
+            def storeFilePath = System.getenv("ANDROID_KEYSTORE_FILE")
+            if (storeFilePath) {
+                storeFile file(storeFilePath)
+                storePassword System.getenv("ANDROID_KEYSTORE_PASSWORD")
+                keyAlias System.getenv("ANDROID_KEY_ALIAS")
+                keyPassword System.getenv("ANDROID_KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            // Only when a keystore was supplied; otherwise the release build stays
+            // unsigned and fails loudly at install time rather than shipping an
+            // APK that silently cannot be upgraded.
+            if (System.getenv("ANDROID_KEYSTORE_FILE")) {
+                signingConfig signingConfigs.release
+            }
         }
     }
 }
@@ -35,6 +77,11 @@ dependencies {
     implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
     implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
     implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
+    // FCM. Pinned to the same version the Hillbcs Chats app ships, so both
+    // Android clients talk to Firebase through an identical messaging stack.
+    // Harmless without google-services.json: the google-services plugin below is
+    // only applied when that file exists, and Firebase simply never initialises.
+    implementation "com.google.firebase:firebase-messaging:25.0.1"
     implementation project(':capacitor-android')
     testImplementation "junit:junit:$junitVersion"
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"

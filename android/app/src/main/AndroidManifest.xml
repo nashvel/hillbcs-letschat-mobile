@@ -65,4 +65,17 @@
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
 
     <uses-permission android:name="android.permission.VIBRATE" />
+    <!--
+        Push notifications. Runtime-requestable from Android 13 (API 33) on, which
+        is why the web layer prompts for it rather than assuming the grant.
+    -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!--
+        In-app updates. The app is distributed outside Play, so upgrading means
+        downloading an APK and handing it to the system installer. Android has no
+        silent path for this by design: the user still confirms in the installer
+        UI, and on Android 8+ they must also grant "install unknown apps" to this
+        app once.
+    -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 </manifest>
