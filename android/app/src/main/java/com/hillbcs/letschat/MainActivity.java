@@ -48,6 +48,30 @@ public class MainActivity extends BridgeActivity {
     }
 
     /**
+     * Reserves the status bar height above the WebView.
+     *
+     * Applied as padding on the WebView rather than a margin on its parent so the
+     * WebView's own background still fills the area during load, and so Capacitor's
+     * keyboard resizing — which adjusts the bottom — is left alone.
+     */
+    private void insetWebViewBelowStatusBar(int top) {
+        Bridge bridge = getBridge();
+        if (bridge == null) {
+            return;
+        }
+        WebView webView = bridge.getWebView();
+        if (webView == null || webView.getPaddingTop() == top) {
+            return;
+        }
+        webView.setPadding(
+            webView.getPaddingLeft(),
+            top,
+            webView.getPaddingRight(),
+            webView.getPaddingBottom()
+        );
+    }
+
+    /**
      * Publishes {@link UpdateInstaller} to the web layer as
      * {@code window.HillbcsUpdater}.
      *
@@ -128,6 +152,19 @@ public class MainActivity extends BridgeActivity {
                     params.height = top;
                     strip.setLayoutParams(params);
                 }
+                /*
+                 * Push the WebView down by the same amount, so web content cannot
+                 * occupy the strip at all.
+                 *
+                 * Colouring the strip is not enough on its own: it is drawn over a
+                 * WebView that still fills the window, so any screen that does not
+                 * pad itself by env(safe-area-inset-top) renders underneath and
+                 * gets covered. Only a few surfaces do that — the conversation
+                 * header and sidebar — which is why the problem appeared on some
+                 * screens and not others. Insetting the viewport fixes every
+                 * screen at once, including ones that do not exist yet.
+                 */
+                insetWebViewBelowStatusBar(top);
                 // Passed through untouched: Capacitor's own inset handling drives
                 // the keyboard resize, and consuming them here would break it.
                 return insets;
