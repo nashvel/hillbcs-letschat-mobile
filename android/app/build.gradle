@@ -23,6 +23,19 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode ciBuildNumber
         versionName ciVersionName
+        /*
+         * Ship only the two ABIs real phones use.
+         *
+         * The Jitsi SDK bundles WebRTC and Hermes native libraries for four
+         * architectures, which took the APK from 8 MB to 186 MB. That matters more
+         * here than in a Play-distributed app: updates are delivered by
+         * downloading the whole APK over whatever connection the user has.
+         *
+         * Dropping x86/x86_64 loses emulators and ChromeOS, not handsets.
+         */
+        ndk {
+            abiFilters 'arm64-v8a', 'armeabi-v7a'
+        }
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -82,6 +95,20 @@ dependencies {
     // Harmless without google-services.json: the google-services plugin below is
     // only applied when that file exists, and Firebase simply never initialises.
     implementation "com.google.firebase:firebase-messaging:25.0.1"
+    /*
+     * Native Jitsi Meet, used instead of the web client on this platform so that
+     * screen sharing works: Android's WebView does not implement
+     * getDisplayMedia(), so the browser-based call surface can never capture the
+     * screen no matter what permissions are granted. The SDK goes through
+     * MediaProjection instead.
+     *
+     * transitive = true is required — the SDK pulls in React Native, Hermes, and
+     * WebRTC, and none of it resolves without it. That is also why this adds tens
+     * of megabytes to the APK.
+     */
+    implementation("org.jitsi.react:jitsi-meet-sdk:$rootProject.ext.jitsiMeetSdkVersion") {
+        transitive = true
+    }
     implementation project(':capacitor-android')
     testImplementation "junit:junit:$junitVersion"
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"

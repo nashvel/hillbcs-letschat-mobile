@@ -21,6 +21,13 @@ allprojects {
     repositories {
         google()
         mavenCentral()
+        // Jitsi publishes the Meet SDK only to its own repository, not Maven
+        // Central. Needed for the native call surface: an Android WebView has no
+        // getDisplayMedia(), so screen sharing is impossible through the web
+        // client and has to come from the native SDK's MediaProjection path.
+        maven {
+            url "https://github.com/jitsi/jitsi-maven-repository/raw/master/releases"
+        }
     }
 }
 

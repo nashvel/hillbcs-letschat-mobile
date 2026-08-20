@@ -36,6 +36,7 @@ import com.getcapacitor.BridgeActivity;
 public class MainActivity extends BridgeActivity {
 
     private UpdateInstaller updateInstaller;
+    private NativeCall nativeCall;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -68,6 +69,9 @@ public class MainActivity extends BridgeActivity {
         // Capability probes, so the web layer can avoid calling into a plugin this
         // build cannot support. Named to match the Laravel messenger's shell.
         webView.addJavascriptInterface(new NativeCapabilities(this), "HillbcsNative");
+        // Native Jitsi, so screen sharing is possible at all on Android.
+        nativeCall = new NativeCall(this, bridge);
+        webView.addJavascriptInterface(nativeCall, "HillbcsCall");
     }
 
     @Override
@@ -75,6 +79,10 @@ public class MainActivity extends BridgeActivity {
         if (updateInstaller != null) {
             updateInstaller.dispose();
             updateInstaller = null;
+        }
+        if (nativeCall != null) {
+            nativeCall.dispose();
+            nativeCall = null;
         }
         super.onDestroy();
     }

@@ -1,5 +1,15 @@
 ext {
-    minSdkVersion = 23
+    /*
+     * 26, up from 23, because jitsi-meet-sdk 13.1.1 declares minSdk 26 and the
+     * manifest merger refuses anything lower. That is Android 8.0+, so devices on
+     * 7.x can no longer install — accepted deliberately in exchange for native
+     * calls and screen sharing.
+     *
+     * tools:overrideLibrary would silence the merger instead, but it only defers
+     * the problem to a runtime crash on the older devices it pretends to support.
+     */
+    minSdkVersion = 26
+    jitsiMeetSdkVersion = '13.1.1'
     compileSdkVersion = 35
     targetSdkVersion = 35
     androidxActivityVersion = '1.9.2'
