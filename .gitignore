@@ -5,3 +5,15 @@ node_modules/
 .DS_Store
 .sourcemaps
 dist/
+
+# Release signing keys. Committing one hands anyone who can read the repo the
+# ability to publish an update that Android will accept as genuinely yours.
+*.keystore
+*.jks
+*.base64.txt
+key.properties
+
+# Firebase config. Not secret — it ships inside every APK — but it is
+# environment-specific, so it is supplied by CI from GOOGLE_SERVICES_JSON rather
+# than pinned in the repo.
+android/app/google-services.json

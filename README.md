@@ -281,3 +281,57 @@ Client code lives in `let-s-chat-frontend`:
 `src/features/updates/services/appUpdateService.ts` and
 `components/UpdateGate.tsx`. It sits on the web side on purpose — update logic
 shipped inside the APK could only be fixed by the update it is meant to deliver.
+
+### Testing the update path
+
+Three levels, cheapest first.
+
+**1. The decision logic — no device, no release.**
+`let-s-chat-frontend/src/features/updates/services/appUpdateService.test.ts` feeds
+a realistic Releases payload through `checkForUpdate()` and pins the cases that
+matter: below the minimum blocks, between the minimum and newest offers, equal to
+the minimum still works, newest says nothing, a failed lookup returns null rather
+than blocking, and a release with no policy line does not lock everyone out.
+
+```bash
+cd let-s-chat-frontend && npm run test
+```
+
+**2. Version wiring and the upgrade itself — device, no CI.**
+Debug builds are all signed with the same local debug key, so upgrades between
+them install for real:
+
+```bash
+cd android
+BUILD_NUMBER=1 VERSION_NAME=1.0.1 ./gradlew assembleDebug
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+
+BUILD_NUMBER=2 VERSION_NAME=1.0.2 ./gradlew assembleDebug
+adb install -r app/build/outputs/apk/debug/app-debug.apk     # upgrades in place
+
+adb shell dumpsys package com.hillbcs.letschat | grep -m1 versionCode
+```
+
+Re-running the `BUILD_NUMBER=1` install afterwards is a useful negative check —
+Android answers `INSTALL_FAILED_VERSION_DOWNGRADE`, which is exactly the rule that
+makes a monotonic `versionCode` mandatory.
+
+**3. The prompt in the app — needs the web layer.**
+The gate lives in the deployed web app, so either deploy it or point the wrapper at
+a dev server:
+
+```bash
+cd let-s-chat-frontend && npm run dev -- --host          # note the LAN address
+cd ../letschat-mobile-wrapper
+CAPACITOR_SERVER_URL=http://<lan-ip>:8081 npx cap sync android
+```
+
+`VITE_APP_UPDATE_RELEASES_API` overrides where the manifest is read from, so the
+gate can be driven against a stub payload instead of waiting for a real release.
+Install a low `BUILD_NUMBER`, point it at a stub advertising a higher `latestBuild`,
+and the bar appears; raise the stub's `minimumBuild` above the installed build and
+it becomes the blocking screen.
+
+Note that `github.run_number` starts at 1 for a new workflow, so the first CI
+release is build 1. A phone left on a hand-built higher `versionCode` will consider
+itself newer than that release.
