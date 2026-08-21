@@ -64,9 +64,29 @@ public class NativeCall {
     private static final String KEY_CURRENT_ROOM = "current-room";
     private static final String KEY_ENDED_ROOM = "ended-room";
 
+    /**
+     * Whether this process has run before, as opposed to this activity.
+     *
+     * Static, so it survives an activity being recreated but not the process dying —
+     * which is exactly the distinction needed below.
+     */
+    private static boolean processSeen = false;
+
     NativeCall(Activity activity, Bridge bridge) {
         this.activity = activity;
         this.bridge = bridge;
+        OngoingCallNotification.createChannels(activity);
+        /*
+         * A call cannot outlive the process, because the conference runs inside it.
+         * So on a cold start any ongoing-call notification still on screen is a
+         * leftover from a process that was killed mid-call, and tapping it would
+         * open an empty conference. Clear it once, and only then: on an activity
+         * recreation the call may genuinely still be running.
+         */
+        if (!processSeen) {
+            processSeen = true;
+            OngoingCallNotification.hide(activity);
+        }
         // Registered up front rather than from join(). A recreated MainActivity has
         // no record of having launched anything, but the conference it launched is
         // still running and will still broadcast when it ends.
@@ -114,12 +134,16 @@ public class NativeCall {
      *     video-capable, so a voice call can still share a screen.
      * @param audioMuted starts with the microphone off
      * @param avatarUrl shown to other participants; ignored when unparseable
+     * @param subject the conversation or group name, for the call UI header
+     * @param conversationAvatarUrl the conversation's picture, for the ongoing-call
+     *     notification. Separate from {@code avatarUrl}, which is this user's own
+     *     and identifies them to other participants.
      * @param jwt may be empty; passed through when the deployment requires auth
      * @return false when the target was rejected or malformed
      */
     /**
-     * Six-argument form kept for the web app deployed before avatars and the mic
-     * choice were passed through.
+     * Six-argument form kept for the web app deployed before avatars, the mic
+     * choice, and the conversation name were passed through.
      *
      * WebView resolves {@code @JavascriptInterface} methods by arity, so without
      * this an updated shell would find no matching {@code join} on an older
@@ -128,7 +152,7 @@ public class NativeCall {
      */
     @JavascriptInterface
     public boolean join(String serverUrl, String room, String displayName, String email, boolean videoMuted, String jwt) {
-        return join(serverUrl, room, displayName, email, videoMuted, jwt, "", false);
+        return join(serverUrl, room, displayName, email, videoMuted, jwt, "", false, "", "");
     }
 
     @JavascriptInterface
@@ -140,7 +164,9 @@ public class NativeCall {
         boolean videoMuted,
         String jwt,
         String avatarUrl,
-        boolean audioMuted
+        boolean audioMuted,
+        String subject,
+        String conversationAvatarUrl
     ) {
         URL server = safeServerUrl(serverUrl);
         String cleanRoom = room == null ? "" : room.replaceAll("[^a-zA-Z0-9_-]", "");
@@ -179,6 +205,20 @@ public class NativeCall {
             .setFeatureFlag("prejoinpage.enabled", false)
             .setConfigOverride("prejoinConfig.enabled", false);
 
+        /*
+         * The conversation or group name, shown in the call UI's header.
+         *
+         * This is where a human-readable name can actually go. The SDK's ongoing
+         * notification cannot carry it: OngoingNotification builds its title and
+         * text from the static ongoing_notification_* string resources and takes
+         * no parameters, so there is nothing per-call to hand it.
+         *
+         * Without a subject the header falls back to the raw room name, which is
+         * generated ("dm42abc12xyz") and means nothing to the person reading it.
+         */
+        if (subject != null && !subject.trim().isEmpty()) {
+            options.setSubject(subject.trim());
+        }
         if (jwt != null && !jwt.trim().isEmpty()) {
             options.setToken(jwt.trim());
         }
@@ -202,6 +242,10 @@ public class NativeCall {
             .apply();
         registerConferenceReceiver();
 
+        // Named for the conversation, with its picture, and carrying the running
+        // duration — the surface the SDK's own notification cannot provide.
+        OngoingCallNotification.show(activity, subject, conversationAvatarUrl, !videoMuted);
+
         // launch() touches the view hierarchy, and @JavascriptInterface methods
         // arrive on a WebView worker thread.
         activity.runOnUiThread(() -> {
@@ -209,6 +253,7 @@ public class NativeCall {
                 JitsiMeetActivity.launch(activity, options.build());
             } catch (Exception e) {
                 Log.e(TAG, "Could not launch the native call", e);
+                OngoingCallNotification.hide(activity);
             }
         });
         return true;
@@ -262,6 +307,7 @@ public class NativeCall {
                     // if the event itself goes nowhere.
                     prefs().edit().putString(KEY_ENDED_ROOM, room).apply();
                     Log.d(TAG, "conference ended, room=" + room + " (" + type + ")");
+                    OngoingCallNotification.hide(activity);
                     notifyWeb("hillbcs-native-call-ended");
                 } else if (type == BroadcastEvent.Type.CONFERENCE_JOINED) {
                     notifyWeb("hillbcs-native-call-joined");

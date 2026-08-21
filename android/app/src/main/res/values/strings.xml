@@ -4,4 +4,19 @@
     <string name="title_activity_main">Let\'s Chat</string>
     <string name="package_name">com.hillbcs.letschat</string>
     <string name="custom_url_scheme">com.hillbcs.letschat</string>
+
+    <!--
+        Overrides the Jitsi SDK's own wording for the ongoing-call notification,
+        the same way drawable/ic_notification overrides its icon: an app resource
+        of the same name wins over a library's during merge.
+
+        Static by necessity. OngoingNotification reads these through getString()
+        with no arguments and its builder takes only (isMuted, context, class), so
+        there is no per-call value to pass — the conversation name cannot appear
+        here. It goes in the call UI header via setSubject() instead. The same
+        limitation rules out an avatar: that notification never calls
+        setLargeIcon, so it has no image slot beyond the monochrome small icon.
+    -->
+    <string name="ongoing_notification_title">Let\'s Chat</string>
+    <string name="ongoing_notification_text">Call in progress. Tap to return.</string>
 </resources>

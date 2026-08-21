@@ -39,6 +39,15 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths"></meta-data>
         </provider>
+
+        <!--
+            Receives the ongoing-call notification's Hang up action and relays it to
+            the Jitsi SDK. Not exported: the only sender is this app's own
+            notification, and letting other apps end calls would be a gift.
+        -->
+        <receiver
+            android:name=".CallActionReceiver"
+            android:exported="false" />
     </application>
 
     <!-- Permissions -->
