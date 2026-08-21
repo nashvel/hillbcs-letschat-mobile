@@ -50,21 +50,19 @@ public class NativeCall {
     private final Bridge bridge;
     private BroadcastReceiver conferenceReceiver;
 
-    /** The room this shell launched, so an end can be attributed to it. */
-    private volatile String currentRoom = "";
-
     /**
-     * A conference that ended without the web layer hearing about it, kept until
-     * {@link #consumeEndedRoom()} drains it.
+     * Where the launched room and the ended room are kept.
      *
-     * The DOM event alone is not enough. It is fire-and-forget into a page that
-     * may not be listening: Android can destroy MainActivity while the Jitsi
-     * activity is in front — it is a second, memory-hungry activity — and the
-     * WebView then reloads the app from the network with no memory of the call.
-     * The event lands on nobody, the leave is never posted, and the conversation
-     * keeps offering "Join" and "End for everyone" for a call that is over.
+     * SharedPreferences rather than fields, because the case this exists for is
+     * exactly the one that destroys fields: Android can tear down MainActivity
+     * while the Jitsi conference — a second, memory-hungry activity — is in front.
+     * A recreated activity has no memory of having launched anything, so an end
+     * arriving afterwards could not be attributed to a room, and the conversation
+     * would never get its "ended a call" message.
      */
-    private volatile String endedRoom = "";
+    private static final String PREFS = "hillbcs-call";
+    private static final String KEY_CURRENT_ROOM = "current-room";
+    private static final String KEY_ENDED_ROOM = "ended-room";
 
     NativeCall(Activity activity, Bridge bridge) {
         this.activity = activity;
@@ -95,9 +93,15 @@ public class NativeCall {
      */
     @JavascriptInterface
     public String consumeEndedRoom() {
-        String room = endedRoom;
-        endedRoom = "";
+        String room = prefs().getString(KEY_ENDED_ROOM, "");
+        if (!room.isEmpty()) {
+            prefs().edit().remove(KEY_ENDED_ROOM).apply();
+        }
         return room;
+    }
+
+    private android.content.SharedPreferences prefs() {
+        return activity.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
     }
 
     /**
@@ -182,9 +186,20 @@ public class NativeCall {
         // prompting for an identity, and the avatar rides along with it.
         options.setUserInfo(userInfo(displayName, email, avatarUrl));
 
-        currentRoom = cleanRoom;
-        // Cleared so a stale end from an earlier call cannot settle this one.
-        endedRoom = "";
+        prefs()
+            .edit()
+            /*
+             * Stored as the web layer sent it, not as sanitised for Jitsi. The web
+             * layer settles the call by matching this against the room it recorded,
+             * so reporting a scrubbed name would silently fail that comparison and
+             * the conversation would never get its "ended a call" message. The two
+             * are identical today — the server applies the same character class —
+             * which is precisely why the difference would be easy to miss later.
+             */
+            .putString(KEY_CURRENT_ROOM, room == null ? "" : room.trim())
+            // Cleared so a stale end from an earlier call cannot settle this one.
+            .remove(KEY_ENDED_ROOM)
+            .apply();
         registerConferenceReceiver();
 
         // launch() touches the view hierarchy, and @JavascriptInterface methods
@@ -242,7 +257,11 @@ public class NativeCall {
                  * would otherwise leave the call unsettled.
                  */
                 if (type == BroadcastEvent.Type.CONFERENCE_TERMINATED || type == BroadcastEvent.Type.READY_TO_CLOSE) {
-                    endedRoom = currentRoom;
+                    String room = prefs().getString(KEY_CURRENT_ROOM, "");
+                    // Recorded before notifying, so the web layer can still find it
+                    // if the event itself goes nowhere.
+                    prefs().edit().putString(KEY_ENDED_ROOM, room).apply();
+                    Log.d(TAG, "conference ended, room=" + room + " (" + type + ")");
                     notifyWeb("hillbcs-native-call-ended");
                 } else if (type == BroadcastEvent.Type.CONFERENCE_JOINED) {
                     notifyWeb("hillbcs-native-call-joined");
