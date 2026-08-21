@@ -188,6 +188,25 @@ public class UpdateInstaller {
         );
     }
 
+    /**
+     * The running versionName, e.g. {@code 1.0.8}, for display.
+     *
+     * Separate from {@link #currentBuild()} on purpose: comparisons stay on the
+     * monotonic versionCode, while this is the string a user recognises. Empty
+     * when unavailable, so the caller can fall back rather than print "null".
+     */
+    @JavascriptInterface
+    public String currentVersion() {
+        try {
+            String name = activity.getPackageManager()
+                .getPackageInfo(activity.getPackageName(), 0)
+                .versionName;
+            return name == null ? "" : name;
+        } catch (Exception e) {
+            return "";
+        }
+    }
+
     /** The running build, so the web layer can compare against the manifest. */
     @JavascriptInterface
     public int currentBuild() {
