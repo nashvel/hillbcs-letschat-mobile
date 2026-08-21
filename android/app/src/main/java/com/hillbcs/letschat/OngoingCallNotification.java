@@ -12,9 +12,7 @@ import android.util.Log;
 
 import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationManagerCompat;
-import androidx.core.app.Person;
 import androidx.core.content.ContextCompat;
-import androidx.core.graphics.drawable.IconCompat;
 
 import org.jitsi.meet.sdk.JitsiMeetActivity;
 
@@ -23,21 +21,21 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 
 /**
- * The ongoing-call notification, in the shape Android promotes to a status bar chip.
+ * The app-owned ongoing-call notification.
  *
- * <p>This exists because the Jitsi SDK's own notification cannot be that shape.
+ * <p>This exists because the Jitsi SDK's own notification is intentionally generic.
  * {@code OngoingNotification} builds a plain notification — its title and text come
  * from static string resources, it never calls {@code setLargeIcon}, and it applies
  * no style — so it cannot carry a conversation name, an avatar, or the call
- * treatment the system reserves for {@link NotificationCompat.CallStyle}. Its
- * builder takes only {@code (isMuted, context, tapBackActivity)}, so there is no
- * per-call value to hand it either.
+ * context. Its builder takes only {@code (isMuted, context, tapBackActivity)}, so
+ * there is no per-call value to hand it either.
  *
- * <p>Rather than fight it, this posts a second notification that is CallStyle, and
- * the SDK's is pushed out of the way by pre-creating its channel quiet: see
- * {@link #createChannels(Context)}. The result is one prominent call entry, with the
- * conversation's name and picture, that the platform surfaces in the status bar and
- * expands to Hang up / return controls.
+ * <p>Rather than fight it, this posts a second regular ongoing notification, and the
+ * SDK's is pushed out of the way by pre-creating its channel quiet: see
+ * {@link #createChannels(Context)}. Do not use {@link NotificationCompat.CallStyle}
+ * here. Current Android builds reject CallStyle notifications unless they are posted
+ * by a foreground service, a user initiated job, or a full-screen call flow; posting
+ * one from the Capacitor plugin thread crashes the app before the call can settle.
  *
  * <p>Hanging up goes through {@code BroadcastIntentHelper.buildHangUpIntent()} via
  * {@link CallActionReceiver}, so the conference is left the same way the in-call
@@ -152,13 +150,6 @@ final class OngoingCallNotification {
     }
 
     private static void post(Context context, String name, Bitmap avatar, boolean video) {
-        Person.Builder person = new Person.Builder().setName(name).setImportant(true);
-        if (avatar != null) {
-            // Adaptive so the platform masks it to a circle, the way it treats every
-            // other person in a notification.
-            person.setIcon(IconCompat.createWithAdaptiveBitmap(avatar));
-        }
-
         PendingIntent hangUp = PendingIntent.getBroadcast(
             context,
             0,
@@ -176,9 +167,11 @@ final class OngoingCallNotification {
             PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
         );
 
+        String contentText = video ? "Video call in progress" : "Voice call in progress";
         NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
-            .setStyle(NotificationCompat.CallStyle.forOngoingCall(person.build(), hangUp))
+            .setContentTitle(name)
+            .setContentText(contentText)
             .setContentIntent(tapBack)
             .setCategory(NotificationCompat.CATEGORY_CALL)
             // Ongoing and non-dismissible: the call outlives the shade, and a user
@@ -188,20 +181,22 @@ final class OngoingCallNotification {
             // The running duration, which is the part people actually read.
             .setUsesChronometer(true)
             .setWhen(startedAt == 0L ? System.currentTimeMillis() : startedAt)
-            .setColorized(true)
             .setColor(ContextCompat.getColor(context, R.color.brandBlue))
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
-            // Read aloud on older versions, where CallStyle has no special treatment
-            // and the layout collapses to title plus text.
-            .setContentText(video ? "Video call in progress" : "Voice call in progress");
+            .addAction(R.drawable.ic_notification, "Hang up", hangUp);
+
+        if (avatar != null) {
+            builder.setLargeIcon(avatar);
+        }
 
         try {
             NotificationManagerCompat.from(context).notify(NOTIFICATION_ID, builder.build());
-        } catch (SecurityException e) {
-            // POST_NOTIFICATIONS was refused. The call itself is unaffected; only
-            // this surface is missing, and the SDK's own notification remains.
-            Log.w(TAG, "Not allowed to post the ongoing call notification", e);
+        } catch (RuntimeException e) {
+            // POST_NOTIFICATIONS can be refused, and OEM notification policy can
+            // still reject optional app-owned notification surfaces. The SDK's
+            // foreground service notification remains, so the call must continue.
+            Log.w(TAG, "Could not post the ongoing call notification", e);
         }
     }
 
