@@ -48,6 +48,7 @@ public class MainActivity extends BridgeActivity {
         configureWebViewPopups();
         paintStatusBarStrip();
         exposeUpdater();
+        ensureJavascriptInterfacesOnFirstPage(savedInstanceState);
     }
 
     /**
@@ -75,6 +76,29 @@ public class MainActivity extends BridgeActivity {
         // Native Jitsi, so screen sharing is possible at all on Android.
         nativeCall = new NativeCall(this, bridge);
         webView.addJavascriptInterface(nativeCall, "HillbcsCall");
+    }
+
+    /**
+     * Capacitor's Bridge constructor starts loading the app before MainActivity can
+     * attach our direct JavaScript interfaces. Android only guarantees interfaces
+     * on pages loaded after addJavascriptInterface(), so a cold start could miss
+     * window.HillbcsCall and React would open the web call shell instead of the SDK.
+     */
+    private void ensureJavascriptInterfacesOnFirstPage(Bundle savedInstanceState) {
+        if (savedInstanceState != null) {
+            return;
+        }
+        Bridge bridge = getBridge();
+        if (bridge == null || bridge.getWebView() == null) {
+            return;
+        }
+        bridge.getWebView().post(() -> {
+            try {
+                bridge.getWebView().reload();
+            } catch (Exception e) {
+                Log.w(TAG, "Could not reload after exposing JavaScript interfaces", e);
+            }
+        });
     }
 
     @Override
