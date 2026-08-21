@@ -43,6 +43,7 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
+        registerPlugin(HillbcsCallPlugin.class);
         super.onCreate(savedInstanceState);
         registerDownloadListener();
         configureWebViewPopups();
@@ -74,8 +75,14 @@ public class MainActivity extends BridgeActivity {
         // build cannot support. Named to match the Laravel messenger's shell.
         webView.addJavascriptInterface(new NativeCapabilities(this), "HillbcsNative");
         // Native Jitsi, so screen sharing is possible at all on Android.
-        nativeCall = new NativeCall(this, bridge);
-        webView.addJavascriptInterface(nativeCall, "HillbcsCall");
+        webView.addJavascriptInterface(getOrCreateNativeCall(bridge), "HillbcsCall");
+    }
+
+    NativeCall getOrCreateNativeCall(Bridge bridge) {
+        if (nativeCall == null) {
+            nativeCall = new NativeCall(this, bridge);
+        }
+        return nativeCall;
     }
 
     /**
