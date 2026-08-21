@@ -68,11 +68,16 @@ public class NativeCall {
     /**
      * Joins {@code room} on {@code serverUrl}.
      *
+     * @param videoMuted starts with the camera off. Deliberately not
+     *     {@code setAudioOnly}: audio-only is a conference-wide mode that drops
+     *     video altogether, and with it the screen-share button — the one feature
+     *     this class exists to provide. Muting the camera leaves the conference
+     *     video-capable, so a voice call can still share a screen.
      * @param jwt may be empty; passed through when the deployment requires auth
      * @return false when the target was rejected or malformed
      */
     @JavascriptInterface
-    public boolean join(String serverUrl, String room, String displayName, String email, boolean audioOnly, String jwt) {
+    public boolean join(String serverUrl, String room, String displayName, String email, boolean videoMuted, String jwt) {
         URL server = safeServerUrl(serverUrl);
         String cleanRoom = room == null ? "" : room.replaceAll("[^a-zA-Z0-9_-]", "");
         if (server == null || cleanRoom.isEmpty()) {
@@ -83,7 +88,7 @@ public class NativeCall {
         JitsiMeetConferenceOptions.Builder options = new JitsiMeetConferenceOptions.Builder()
             .setServerURL(server)
             .setRoom(cleanRoom)
-            .setAudioOnly(audioOnly)
+            .setVideoMuted(videoMuted)
             // The point of this class. Off by default in some SDK builds, so it is
             // set explicitly rather than assumed.
             .setFeatureFlag("android.screensharing.enabled", true)
