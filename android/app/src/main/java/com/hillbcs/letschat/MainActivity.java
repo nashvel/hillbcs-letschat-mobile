@@ -49,6 +49,9 @@ public class MainActivity extends BridgeActivity {
         configureWebViewPopups();
         paintStatusBarStrip();
         exposeUpdater();
+        // Before the WebView loads: a push can arrive while the web layer has
+        // never run, and Android drops notifications naming an unknown channel.
+        PushChannels.ensure(this);
         ensureJavascriptInterfacesOnFirstPage(savedInstanceState);
     }
 

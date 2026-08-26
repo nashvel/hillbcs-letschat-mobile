@@ -19,4 +19,21 @@
     -->
     <string name="ongoing_notification_title">Let\'s Chat</string>
     <string name="ongoing_notification_text">Call in progress. Tap to return.</string>
+
+    <!--
+        Notification channels for push. The ids are a contract with the server:
+        FirebasePushService puts one of them in android.notification.channel_id
+        on every message it sends, and Android silently discards a notification
+        naming a channel that does not exist. They are also created from
+        JavaScript by nativePush.ts; all three places must agree.
+
+        Declared here so PushChannels and the manifest's
+        default_notification_channel_id cannot drift apart from each other.
+    -->
+    <string name="push_channel_messages">hillbcs_chat_messages</string>
+    <string name="push_channel_calls">hillbcs_chat_calls</string>
+    <string name="push_channel_messages_name">Chat messages</string>
+    <string name="push_channel_messages_description">New messages, mentions, and chat updates</string>
+    <string name="push_channel_calls_name">Calls</string>
+    <string name="push_channel_calls_description">Incoming voice and video calls</string>
 </resources>

@@ -9,4 +9,12 @@
         white strip that then flips to blue.
     -->
     <color name="brandBlue">#0b82ee</color>
+
+    <!--
+        Tint Android applies behind the small icon in a push notification. Same
+        brand blue, kept as a separate name because this one is referenced by
+        com.google.firebase.messaging.default_notification_color in the manifest
+        rather than by app code, and the two uses should be free to diverge.
+    -->
+    <color name="notificationAccent">#0b82ee</color>
 </resources>

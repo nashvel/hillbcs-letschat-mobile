@@ -48,6 +48,39 @@
         <receiver
             android:name=".CallActionReceiver"
             android:exported="false" />
+
+        <!--
+            Push notification presentation.
+
+            While the app is backgrounded or dead, the notification is built by
+            the Firebase SDK from the server's `notification` block, not by any
+            code in this app — so these three values are the only control over
+            how it looks, and without them Firebase logs a warning and falls
+            back to defaults.
+
+            The icon must be a monochrome silhouette with transparency: Android
+            masks the small icon to its alpha channel, so the launcher icon used
+            as a fallback renders as a solid white square. ic_notification.png
+            already shipped in five density buckets but nothing referenced it,
+            which is exactly the square-blob case.
+
+            default_notification_channel_id is the fallback for a push whose
+            named channel does not exist on the device. That is a real path, not
+            a theoretical one: the channels are otherwise created by JavaScript
+            at sign-in, so a push arriving before the web layer has ever run —
+            first launch, or after the user clears app data — names a channel
+            Android does not know and is dropped without a trace. PushChannels
+            also creates them natively at startup to close the same gap.
+        -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/ic_notification" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_color"
+            android:resource="@color/notificationAccent" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="@string/push_channel_messages" />
     </application>
 
     <!-- Permissions -->
